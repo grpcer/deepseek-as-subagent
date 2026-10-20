@@ -292,6 +292,9 @@ thinking 并使用对应 effort。`_reasoning_effort_options` 只是配置文件
 
 ### 实时查看运行过程（`trace`）
 
+同步派工始终会发送单行的 MCP 进度通知（开始、每轮思考的简短摘录、每次工具调用、完成），
+支持显示进度的宿主会展示 DeepSeek 当前在做什么。需要完整细节时：
+
 设置 `"trace": true` 后，可以在派工运行期间查看过程：
 
 ```bash

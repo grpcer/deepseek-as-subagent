@@ -24,10 +24,10 @@ from threading import Event, Lock
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 
-from . import __version__
+from . import __version__, trace_log
 from .agent_loop import AgentIncompleteResponse, AgentLoopCancelled, AgentLoopError
 from .provider_retry import AgentBudgetExceeded, MutationOutcomeError, MutationOutcomeCancelled, ProviderOutputError
 from .mutation_outcome import mutation_failure_message, records_from_result
@@ -291,11 +291,15 @@ async def _run_sync_cancellable(full_task: str, config: Config) -> dict:
                 raise MutationOutcomeCancelled(message, tuple(records)) from None
         raise
 
-async def _delegate(task: str, context: str, profile: ExecutionProfile, model: ModelChoice) -> str:
+async def _delegate(
+    task: str, context: str, profile: ExecutionProfile, model: ModelChoice,
+    ctx: Context | None = None,
+) -> str:
     try:
         config, full_task = _prepare_sync_request(task, context, profile, model)
     except JobError as e:
         return str(e)
+    trace_log.progress_sink.set(trace_log.mcp_progress(ctx, asyncio.get_running_loop()))
     try:
         result = await _run_sync_cancellable(full_task, config)
     except JobBusy as e:
@@ -323,14 +327,18 @@ async def _delegate(task: str, context: str, profile: ExecutionProfile, model: M
     return _format_sync_result(result)
 
 @mcp.tool(annotations=_AGENT_EXECUTION)
-async def delegate_to_deepseek(task: str, context: str = "", model: ModelChoice = "flash") -> str:
+async def delegate_to_deepseek(
+    task: str, context: str = "", model: ModelChoice = "flash", ctx: Context = None,
+) -> str:
     """Run a full coding delegation; Flash is default, Pro is for hard tasks."""
-    return await _delegate(task, context, CODING_PROFILE, model)
+    return await _delegate(task, context, CODING_PROFILE, model, ctx)
 
 @mcp.tool(annotations=_READONLY_AGENT_EXECUTION)
-async def delegate_to_deepseek_readonly(task: str, context: str = "", model: ModelChoice = "flash") -> str:
+async def delegate_to_deepseek_readonly(
+    task: str, context: str = "", model: ModelChoice = "flash", ctx: Context = None,
+) -> str:
     """Run pure file analysis; Flash is default, Pro is for hard tasks."""
-    return await _delegate(task, context, READONLY_PROFILE, model)
+    return await _delegate(task, context, READONLY_PROFILE, model, ctx)
 
 
 def _prepare_sync_request(task: str, context: str, profile: ExecutionProfile, model: ModelChoice = "flash") -> tuple[Config, str]:

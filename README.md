@@ -298,6 +298,10 @@ those fields to `provider-default` or remove them.
 
 ### Watching a run (`trace`)
 
+Synchronous delegations always report one-line MCP progress notifications
+(start, a short excerpt of each turn's reasoning, each tool call, completion),
+so hosts that render progress show what DeepSeek is doing. For the full detail:
+
 Set `"trace": true` to follow a delegation while it runs:
 
 ```bash

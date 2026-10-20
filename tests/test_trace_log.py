@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import stat
@@ -116,6 +117,46 @@ class TraceLogTests(unittest.TestCase):
     def test_trace_setting_must_be_boolean(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "trace must be true or false"):
             self._config(trace="yes")
+
+    def test_progress_sink_receives_status_without_trace_file(self) -> None:
+        updates: list[str] = []
+        token = trace_log.progress_sink.set(updates.append)
+        self.addCleanup(trace_log.progress_sink.reset, token)
+
+        self._run(self._config())
+
+        self.assertFalse(self.trace_file.exists())
+        self.assertTrue(updates[0].startswith("DeepSeek started · deepseek-flash"))
+        self.assertIn("Turn 0 · thinking: I should inspect the docs first.", updates)
+        self.assertIn("Read path=doc.txt offset=3 [ok, 16 chars]", updates)
+        self.assertTrue(updates[-1].startswith("DeepSeek done · turns=2"))
+        self.assertFalse(any("SECRET FILE BODY" in update for update in updates))
+        self.assertTrue(all(len(u) <= trace_log.MAX_PROGRESS_CHARS + 20 for u in updates))
+
+    def test_failing_progress_sink_does_not_fail_the_run(self) -> None:
+        def broken(_text: str) -> None:
+            raise RuntimeError("host went away")
+
+        token = trace_log.progress_sink.set(broken)
+        self.addCleanup(trace_log.progress_sink.reset, token)
+        self.assertEqual(self._run(self._config())["final_message"], "summary ready")
+
+    def test_mcp_progress_forwards_from_worker_threads(self) -> None:
+        calls: list[tuple] = []
+
+        class FakeContext:
+            async def report_progress(self, progress, total=None, message=None):
+                calls.append((progress, total, message))
+
+        async def scenario() -> None:
+            send = trace_log.mcp_progress(FakeContext(), asyncio.get_running_loop())
+            await asyncio.to_thread(send, "first")
+            await asyncio.to_thread(send, "second")
+            await asyncio.sleep(0.05)
+
+        asyncio.run(scenario())
+        self.assertEqual(calls, [(1, None, "first"), (2, None, "second")])
+        self.assertIsNone(trace_log.mcp_progress(None, None))
 
     def test_config_file_trace_key_is_loaded(self) -> None:
         with patch.dict(os.environ, {"DEEPSEEK_WORKSPACE": str(self.workspace)}):

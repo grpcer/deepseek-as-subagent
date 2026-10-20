@@ -61,6 +61,7 @@ CONFIG_KEYS = frozenset(
         "max_run_seconds",
         "allowed_tools",
         "base_url",
+        "trace",
     }
 )
 logger = logging.getLogger(__name__)
@@ -302,6 +303,12 @@ def _load_allowed_tools(data: dict) -> list[str]:
     return list(tools)
 
 
+def _validate_trace(value: object) -> bool:
+    if not isinstance(value, bool):
+        raise RuntimeError("trace must be true or false")
+    return value
+
+
 def _validate_model(value: object, field_name: str = "model") -> str:
     if not isinstance(value, str) or not value.strip():
         raise RuntimeError(f"{field_name} must be a non-empty string")
@@ -405,6 +412,8 @@ class Config:
     flash_reasoning_effort: str = PROVIDER_DEFAULT_REASONING_EFFORT
     pro_reasoning_effort: str = PROVIDER_DEFAULT_REASONING_EFFORT
     max_output_tokens: int = DEFAULT_MAX_OUTPUT_TOKENS
+    # Opt-in private trace of reasoning and tool activity (see trace_log.py).
+    trace: bool = False
 
     def __post_init__(self) -> None:
         if is_unsafe_workspace_root(self.workspace):
@@ -428,6 +437,7 @@ class Config:
         self.max_turns = _validate_max_turns(self.max_turns)
         self.max_output_tokens = _validate_max_output_tokens(self.max_output_tokens)
         self.max_run_seconds = _validate_max_run_seconds(self.max_run_seconds)
+        self.trace = _validate_trace(self.trace)
         if self.delegation_capability not in {"coding", "readonly"}:
             raise RuntimeError("invalid delegation capability")
         self._validate_mutation_runtime()
@@ -467,6 +477,7 @@ class Config:
             reasoning_effort=flash_effort,
             flash_reasoning_effort=flash_effort,
             pro_reasoning_effort=pro_effort,
+            trace=_validate_trace(data.get("trace", False)),
         )
 
     @classmethod

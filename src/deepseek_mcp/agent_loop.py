@@ -35,6 +35,7 @@ from .resource_budget import (
 )
 from .tools import build_tool_schemas, execute_tool
 from .tool_process import execute_in_subprocess
+from . import trace_log as trace
 
 logger = logging.getLogger(__name__)
 
@@ -115,15 +116,19 @@ def run_agent(
         controls,
         execution_lease_fd,
     )
+    trace.run_start(config, task)
     try:
         for turn in range(config.max_turns):
             result = _run_turn(state, turn)
             if result is not None:
+                trace.run_result(config, result)
                 return result
         _raise_max_turns(state)
     except (AgentLoopCancelled, AgentLoopError) as error:
+        trace.run_error(config, error)
         _raise_with_mutation_records(state, error)
     except Exception as error:
+        trace.run_error(config, error)
         if state.mutations.records:
             _raise_with_mutation_records(state, error)
         raise
@@ -189,6 +194,7 @@ def _run_turn(state: _AgentState, turn: int) -> dict | None:
         deadline=state.deadline,
     )
     message = _record_response(state, response, request_bytes)
+    trace.response(state.config, turn, state.messages[-1])
     _check_cancel(state.controls.cancel)
     if not message.tool_calls:
         return _finalize_or_steer(state, message, turn)
@@ -362,6 +368,7 @@ def _execute_and_record_tool(state: _AgentState, tool_call, turn: int) -> None:
         deadline=state.deadline,
         outcome_reporter=state.mutations.add,
     )
+    trace.tool(state.config, tool_call, result)
     if tool_call.function.name == "Bash":
         record_bash_result(state, result, turn)
     state.messages.append(

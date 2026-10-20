@@ -296,6 +296,22 @@ is only an in-file hint and is ignored at runtime. New installer-generated
 configs explicitly set both slots to `high`; for a generic local server, change
 those fields to `provider-default` or remove them.
 
+### Watching a run (`trace`)
+
+Set `"trace": true` to follow a delegation while it runs:
+
+```bash
+tail -f ~/.deepseek-mcp/trace.log
+```
+
+Each turn records the model's reasoning (`reasoning_content`), its reply, and
+one line per tool call with a short argument preview (path, Glob/Grep pattern,
+truncated Bash command) plus the result size and error status. File contents,
+Write/Edit/NotebookEdit payloads and tool results are never written. The trace
+is off by default because, unlike `server.log`, it contains reasoning text and
+command previews; it uses the same private (0600), size-bounded, rotating file
+handling as `server.log`, and a trace write failure never fails the run.
+
 ## Local / OpenAI-compatible models
 
 Set `base_url` and the model IDs in the existing config. The public `flash` and

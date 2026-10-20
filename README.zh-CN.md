@@ -290,6 +290,20 @@ thinking 并使用对应 effort。`_reasoning_effort_options` 只是配置文件
 新安装器生成的配置会显式把两个槽位都设为 `high`；连接通用本地服务时，请删除这些字段
 或将其设为 `provider-default`。
 
+### 实时查看运行过程（`trace`）
+
+设置 `"trace": true` 后，可以在派工运行期间查看过程：
+
+```bash
+tail -f ~/.deepseek-mcp/trace.log
+```
+
+每一轮会记录模型的思考（`reasoning_content`）、回复，以及每次工具调用的一行摘要：参数预览
+（路径、Glob/Grep pattern、截断后的 Bash 命令）和结果大小、是否报错。文件内容、
+Write/Edit/NotebookEdit 的写入内容以及工具结果本身都不会写入。由于 trace 与 `server.log`
+不同，包含思考文本和命令预览，默认关闭；它与 `server.log` 使用相同的私有（0600）、限大小、
+自动轮转的文件处理，写 trace 失败不会导致派工失败。
+
 ## 本地 / OpenAI-compatible 模型
 
 在现有配置里设置 `base_url` 和模型 ID。公共的 `flash`、`pro` 仍然只是宿主侧的 profile，
